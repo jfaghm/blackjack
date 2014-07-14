@@ -12,6 +12,8 @@ import os
 import random
 
 
+#credits not updating properly
+
 class Analytics():
 	"""Analyze playing patterns and probabilities"""
 	def __init__(self,player,dealer,deck):
@@ -45,7 +47,6 @@ class Game():
 					print('You do not have sufficient credits to make this wager. You have ' + str(self.player.credits) + ' credits left.')
 			except ValueError:
 				print('That was an invalid number. Please enter a value >= 1')
-		self.player.history['bets'].append(initial_bet)
 		self.player.bet = initial_bet
 		return initial_bet
 	
@@ -104,14 +105,16 @@ class Game():
 	def play_one_round(self):
 		""" Play a single hand. Both player and dealer take turns after drawing two cards from the deck."""
 		blackjack = False
-		player_bet = self.get_player_bet()
-		self.player.credits  = self.player.credits-player_bet #remove the bet amount from the player's account
-		print('You bet ' + str(player_bet))
+		self.player.bet = self.get_player_bet()
+		self.player.credits  = self.player.credits-self.player.bet #remove the bet amount from the player's account
+		print('You bet ' + str(self.player.bet))
 		dealer_turn = False
 		self.deal_two_cards_each(dealer_turn)
-		winner,blackjack = self.check_for_blackjack() #check to see if anyone got a blackjack outright
+		winner,is_blackjack = self.check_for_blackjack() #check to see if anyone got a blackjack outright
+		if not winner == None:
+			self.update_credits(winner, is_blackjack)
 		if winner == None:
-			self.player.play_hand(self.deck)
+			self.player.play_hand(self.deck,self.dealer)
 			if self.check_for_bust(self.player):
 				print('Player bust!')
 				winner =  -1
@@ -121,6 +124,8 @@ class Game():
 			self.dealer.show_hand(dealer_turn)
 			self.dealer.play_hand(self.deck,dealer_turn,self.player)
 			winner =  self.get_winner()
+			self.update_credits(winner, is_blackjack)
+		assert not winner == None #if there is no winner at this stage something is wrong!
 		self.player.hand.return_to_deck(self.deck)
 		self.dealer.hand.return_to_deck(self.deck)
 		
@@ -140,9 +145,16 @@ class Game():
 			self.deck.shuffle()
 			print('### Round '+str(round_number)+' ###')
 			winner = self.play_one_round()
+			self.record_player_history(winner)
 			round_number = round_number+1
+			print self.player.history['moves']
+			print self.player.history['bets']
 			
-
+	def record_player_history(self,winner):
+		self.player.history['outcome'].append(winner)
+		self.player.history['bets'].append(self.player.bet)
+		self.player.history['rounds'] = self.player.history['rounds'] + 1
+	
 class Dealer():
 	def __init__(self):
 		"""Initialize a new Dealer with an empty hand"""
@@ -196,19 +208,23 @@ class Player():
 		self.name = name
 		self.hand = Hand()
 		self.bet = 0
-		self.history = {'rounds':0,'bets':[], 'outcome':[], 'risk':[]} #use later to log playing history
+		self.help = False
+		self.move_number = 0
+		self.history = {'rounds':0,'bets':[], 'outcome':[], 'moves':[]} #use later to log playing history
 	def show_hand(self):
 		"""Print the value of the player's hand."""
 		print(self.name + ' current hand: ')
 		for c in self.hand.cards:
 			print(c) 
 		print('For a total of: ' + str(self.hand.total))
-	def play_hand(self,deck):
-		"""Controls the player logic to hit, stand, or double down."""
+	def play_hand(self,deck, dealer):
+		"""Controls the player logic to hit, stand, or double down. Returns player choice to handle case with double dowm"""
 		hit = 1
+		self.help = True
 		while self.hand.total < 21 and hit == 1:
-			hit = self.hit_or_stand()
-			if hit == 0:
+			hit = self.hit_or_stand(self.help,deck,dealer)
+			self.move_number = self.move_number + 1
+			if not hit == 1:
 				break
 			self.hand.draw_from_deck(deck)
 			self.show_hand()
@@ -218,21 +234,35 @@ class Player():
 			print(self.name + " doubles down. Total wager: " + str(self.bet))
 			self.hand.draw_from_deck(deck)
 			self.show_hand()
-			return
+			return 
 		if hit == 0 or self.hand.total >= 21:
-			return
-		
-	def hit_or_stand(self):
-		"""Prompt the player to hit, stand, or double her wager"""
-		#choice = raw_input('Continue or stop? You have a ' + str(self.get_bust_probability(self.player.hand,self.dealer.hand)) + ' percent probability of busting')
-		choice = raw_input('Press any key to Hit, "s" to [s]tand, or "d" to [d]ouble down > ')
-		if choice == "s":
-			return 0
-		if choice == "d":
-			return 2
+			return 
+	
+	def get_bust_probability(self,deck,dealer):
+		margin = 21 - self.hand.total
+		deck.cards.append(dealer.hand.cards[1]) #we need to put back the dealer's hidden card since we cannot account for it in the probabilities
+		over_margin = len([c for c in deck.cards if c.value > margin]) * 1.0
+		deck.cards.remove(dealer.hand.cards[1]) #remove the dealer's hidden card that we had inserted to compute accurate probabilities
+		return round((over_margin/len(Deck().cards))*100.0) #in case there is more than a single deck
+	
+	def hit_or_stand(self, help,deck,dealer):
+		"""Prompt the player to hit, stand, or double her wager. Give bust probabilities if the player asked for help"""
+		risk = self.get_bust_probability(deck, dealer)
+		move = 1 #assume the player hits
+		if not help:
+			choice = raw_input('Press any key to Hit, "s" to [s]tand, or "d" to [d]ouble down > ')
 		else:
-			return 1
-		
+			choice = raw_input('Press any key to Hit, "s" to [s]tand, or "d" to [d]ouble down. You have a ' + str(risk) + ' percent probability of busting >')
+		if choice == "s":
+			move = 0
+		if choice == "d":
+			move =  2
+		self.log_move_and_risk(move,risk)
+		print move
+		return move
+	
+	def log_move_and_risk(self,move,risk):
+		self.history['moves'].append({self.move_number:[move,risk]})
 		
 class Card():
 	"""A class to handle card logic"""
