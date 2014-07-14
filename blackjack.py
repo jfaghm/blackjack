@@ -10,22 +10,25 @@ Created by James on 2014-07-03.
 import sys
 import os
 import random
+import matplotlib.pyplot as plt
 
 
 #credits not updating properly
 
 class Analytics():
 	"""Analyze playing patterns and probabilities"""
-	def __init__(self,player,dealer,deck):
+	def __init__(self,player):
 			self.player = player
-			self.dealer = dealer
-			self.deck =deck
-	def get_bust_probability():
-		margin = 21 - self.player.hand.total
-		self.deck.cards.append(self.dealer.hand.cards[1]) #we need to put back the dealer's hidden card since we cannot account for it in the probabilities
-		over_margin = len([c for c in self.deck.cards if c.value > margin]) 
-		self.deck.cards.remove(self.dealer.hand.cards[1]) #remove the dealer's hidden card that we had inserted to compute accurate probabilities
-		return round((over_margin/len(Deck().cards))*100.0)
+	
+	def plot_credit_decay(self):
+		credit = self.player.history['credits']
+		print credit
+		plt.plot(credit)
+		plt.show()
+		
+	def plot_move_vs_risk(self):
+		moves = self.player.history['moves']
+		
 	
 class Game():
 	
@@ -150,8 +153,9 @@ class Game():
 			loss_streak = self.update_streak(loss_streak,winner)
 			self.record_player_history(winner)
 			round_number = round_number+1
+			print(self.player.history['credits'])
 			
-	def update_streak(self,loss_streak, winner):
+	def update_streak(self,loss_streak,winner):
 		"""Keep tabs on the player's winning/losing streak to offer help"""
 		if winner == -1:
 			loss_streak = loss_streak + 1
@@ -159,17 +163,19 @@ class Game():
 			loss_streak = 0
 		if loss_streak > 0 and loss_streak % 3 == 0:
 			help = None
-			while not help == "y" and not help =="n":
+			while not help == "y" and not help =="n" and self.player.help == False:
 				help = raw_input('You seem to be struggling. You have lost ' + str(loss_streak) + ' hands in a row. Would you like some assistance? Enter "y" for [Y]es or "n" for [N]o > ')
 			if help == "y":
 				self.player.help=True		
 		return loss_streak
 					
-			
 	def record_player_history(self,winner):
+		"""Keep track of player history, bets, and outcomes (win/lose/tie)."""
 		self.player.history['outcome'].append(winner)
 		self.player.history['bets'].append(self.player.bet)
 		self.player.history['rounds'] = self.player.history['rounds'] + 1
+		self.player.history['credits'].append(self.player.credits)
+		
 	
 class Dealer():
 	def __init__(self):
@@ -226,7 +232,7 @@ class Player():
 		self.bet = 0
 		self.help = False
 		self.move_number = 0
-		self.history = {'rounds':0,'bets':[], 'outcome':[], 'moves':[]} #use later to log playing history
+		self.history = {'rounds':0,'bets':[], 'outcome':[], 'moves':[], 'credits':[]} #use later to log playing history
 	def show_hand(self):
 		"""Print the value of the player's hand."""
 		print(self.name + ' current hand: ')
@@ -339,6 +345,9 @@ class Hand():
 def main():
 	g = Game("James",100)
 	g.start()
+	#show player analytics
+	#a = Analytics(g.player)
+	#a.plot_credit_decay()
 
 if __name__ == '__main__':
 	main()
