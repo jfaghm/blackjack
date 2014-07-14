@@ -128,6 +128,7 @@ class Game():
 		assert not winner == None #if there is no winner at this stage something is wrong!
 		self.player.hand.return_to_deck(self.deck)
 		self.dealer.hand.return_to_deck(self.deck)
+		return winner
 		
 	def update_credits(self,winner,is_blackjack):
 		"""Credit the player's account if they win or tie"""
@@ -141,14 +142,29 @@ class Game():
 	def start(self):
 		"""This is where the game flow is controlled."""
 		round_number = 1
+		loss_streak = 0
 		while self.player.credits >= 1:
 			self.deck.shuffle()
 			print('### Round '+str(round_number)+' ###')
 			winner = self.play_one_round()
+			loss_streak = self.update_streak(loss_streak,winner)
 			self.record_player_history(winner)
 			round_number = round_number+1
-			print self.player.history['moves']
-			print self.player.history['bets']
+			
+	def update_streak(self,loss_streak, winner):
+		"""Keep tabs on the player's winning/losing streak to offer help"""
+		if winner == -1:
+			loss_streak = loss_streak + 1
+		else:
+			loss_streak = 0
+		if loss_streak > 0 and loss_streak % 3 == 0:
+			help = None
+			while not help == "y" and not help =="n":
+				help = raw_input('You seem to be struggling. You have lost ' + str(loss_streak) + ' hands in a row. Would you like some assistance? Enter "y" for [Y]es or "n" for [N]o > ')
+			if help == "y":
+				self.player.help=True		
+		return loss_streak
+					
 			
 	def record_player_history(self,winner):
 		self.player.history['outcome'].append(winner)
@@ -220,7 +236,6 @@ class Player():
 	def play_hand(self,deck, dealer):
 		"""Controls the player logic to hit, stand, or double down. Returns player choice to handle case with double dowm"""
 		hit = 1
-		self.help = True
 		while self.hand.total < 21 and hit == 1:
 			hit = self.hit_or_stand(self.help,deck,dealer)
 			self.move_number = self.move_number + 1
