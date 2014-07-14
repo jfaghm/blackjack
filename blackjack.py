@@ -249,16 +249,21 @@ class Player():
 		"""Prompt the player to hit, stand, or double her wager. Give bust probabilities if the player asked for help"""
 		risk = self.get_bust_probability(deck, dealer)
 		move = 1 #assume the player hits
-		if not help:
-			choice = raw_input('Press any key to Hit, "s" to [s]tand, or "d" to [d]ouble down > ')
-		else:
-			choice = raw_input('Press any key to Hit, "s" to [s]tand, or "d" to [d]ouble down. You have a ' + str(risk) + ' percent probability of busting >')
+		if len(self.hand.cards)==2:
+			if not help:
+				choice = raw_input('Press any key to Hit, "s" to [s]tand, or "d" to [d]ouble down > ')
+			else:
+				choice = raw_input('Press any key to Hit, "s" to [s]tand, or "d" to [d]ouble down. You have a ' + str(risk) + ' percent probability of busting >')
+		else:#if your have more than two cards you can't double down
+			if not help:
+				choice = raw_input('Press any key to Hit or "s" to [s]tand > ')
+			else:
+				choice = raw_input('Press any key to Hit or "s" to [s]tand. You have a ' + str(risk) + ' percent probability of busting >')
 		if choice == "s":
 			move = 0
-		if choice == "d":
+		if choice == "d" and len(self.hand.cards)==2:
 			move =  2
 		self.log_move_and_risk(move,risk)
-		print move
 		return move
 	
 	def log_move_and_risk(self,move,risk):
